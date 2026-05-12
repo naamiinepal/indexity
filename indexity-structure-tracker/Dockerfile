@@ -10,7 +10,8 @@ RUN npm run build
 
 # ---
 
-FROM nikolaik/python-nodejs:python3.6-nodejs12
+# FROM nikolaik/python-nodejs:python3.6-nodejs12
+FROM nikolaik/python-nodejs:python3.11-nodejs20
 
 ENV NODE_ENV production
 ENV CRON_SCHEDULE="0 0 * * *"
@@ -27,7 +28,7 @@ COPY --from=builder /build/python/ /indexity-tracker/python/
 
 RUN pip install --upgrade pip && pip install -r python/requirements.txt
 
-RUN apt-get update && apt-get -y install "cron=${CRON_VERSION}"
+RUN apt-get update && apt-get -y install cron
 RUN mkdir /indexity-tracker/logs
 
 RUN chmod 0744 /etc/crontab \
