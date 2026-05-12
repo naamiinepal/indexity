@@ -28,7 +28,7 @@ RUN apk --update add bash jq
 
 # Copy the script used for dynamic configuration
 COPY scripts/update_config.sh /update_config.sh
-RUN chmod +x /update_config.sh
+RUN sed -i 's/\r$//' /update_config.sh && chmod +x /update_config.sh
 
 ## Copy our default nginx config
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
