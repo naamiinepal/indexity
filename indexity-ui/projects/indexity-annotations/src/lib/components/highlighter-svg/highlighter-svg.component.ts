@@ -35,6 +35,20 @@ import {
 import { BehaviorSubject } from 'rxjs';
 import { AnnotationLabelGroup } from '@app/annotations/models/annotation-label-group.model';
 
+interface DrawnShape {
+  type: AnnotationShapeType;
+  width: number;
+  height: number;
+  posX: number;
+  posY: number;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  color: string;
+  name: string;
+}
+
 @Component({
   selector: 'surg-highlighter-svg',
   templateUrl: './highlighter-svg.component.html',
@@ -114,19 +128,7 @@ export class HighlighterSvgComponent implements OnChanges {
     color: '#b31111',
     name: '',
   };
-  drawnShape: {
-    type: AnnotationShapeType;
-    width: number;
-    height: number;
-    posX: number;
-    posY: number;
-    x1: number;
-    y1: number;
-    x2: number;
-    y2: number;
-    color: string;
-    name: string;
-  } = {
+  drawnShape: DrawnShape = {
     ...this.initShape,
   };
   lastAnnotation: Annotation;
@@ -212,7 +214,8 @@ export class HighlighterSvgComponent implements OnChanges {
       this.drawnShape = {
         ...this.drawnShape,
         type: getAnnotationShapeType(this.annotationToUpdate.shape),
-        ...this.annotationToUpdate.label,
+        color: this.annotationToUpdate.label?.color || this.drawnShape.color,
+        name: this.annotationToUpdate.label?.name || this.drawnShape.name,
       };
     }
 
@@ -282,34 +285,10 @@ export class HighlighterSvgComponent implements OnChanges {
       ...annotationWithCurrentChanges.shape.positions,
       ...this.shape.positions,
     };
-    const currentPosition = this.getPositionAtCurrentTime(
-      annotationWithCurrentChanges.shape,
+    this.drawnShape = this.buildDrawnShapeFromPosition(
+      this.getPositionAtCurrentTime(annotationWithCurrentChanges.shape),
+      getAnnotationShapeType(annotationWithCurrentChanges.shape),
     );
-    const isLine = isLineAnnotationPosition(currentPosition);
-    this.drawnShape = {
-      ...this.drawnShape,
-      type: getAnnotationShapeType(annotationWithCurrentChanges.shape),
-      height: isLine
-        ? Math.abs(currentPosition.y2 - currentPosition.y1)
-        : currentPosition.height,
-      width: isLine
-        ? Math.abs(currentPosition.x2 - currentPosition.x1)
-        : currentPosition.width,
-      posX: isLine
-        ? Math.min(currentPosition.x1, currentPosition.x2)
-        : currentPosition.x,
-      posY: isLine
-        ? Math.min(currentPosition.y1, currentPosition.y2)
-        : currentPosition.y,
-      x1: isLine ? currentPosition.x1 : currentPosition.x,
-      y1: isLine ? currentPosition.y1 : currentPosition.y,
-      x2: isLine
-        ? currentPosition.x2
-        : currentPosition.x + currentPosition.width,
-      y2: isLine
-        ? currentPosition.y2
-        : currentPosition.y + currentPosition.height,
-    };
   }
 
   toLineDrawnShape(
@@ -317,7 +296,7 @@ export class HighlighterSvgComponent implements OnChanges {
     y1: number,
     x2: number,
     y2: number,
-  ): typeof this.drawnShape {
+  ): DrawnShape {
     return {
       ...this.drawnShape,
       type: LINE_ANNOTATION_SHAPE,
@@ -329,6 +308,39 @@ export class HighlighterSvgComponent implements OnChanges {
       posY: Math.min(y1, y2),
       width: Math.abs(x2 - x1),
       height: Math.abs(y2 - y1),
+    };
+  }
+
+  buildDrawnShapeFromPosition(
+    position: AnnotationPosition,
+    shapeType: AnnotationShapeType,
+  ): DrawnShape {
+    if (isLineAnnotationPosition(position)) {
+      return {
+        ...this.drawnShape,
+        type: LINE_ANNOTATION_SHAPE,
+        height: Math.abs(position.y2 - position.y1),
+        width: Math.abs(position.x2 - position.x1),
+        posX: Math.min(position.x1, position.x2),
+        posY: Math.min(position.y1, position.y2),
+        x1: position.x1,
+        y1: position.y1,
+        x2: position.x2,
+        y2: position.y2,
+      };
+    }
+
+    return {
+      ...this.drawnShape,
+      type: shapeType,
+      height: position.height,
+      width: position.width,
+      posX: position.x,
+      posY: position.y,
+      x1: position.x,
+      y1: position.y,
+      x2: position.x + position.width,
+      y2: position.y + position.height,
     };
   }
 
@@ -572,7 +584,7 @@ export class HighlighterSvgComponent implements OnChanges {
               this.svgOverlay.height,
             ),
           };
-      const shape = {
+      const shape: AnnotationShape = {
         ...this.shape,
         type: this.isLineDrawing()
           ? LINE_ANNOTATION_SHAPE
@@ -587,7 +599,7 @@ export class HighlighterSvgComponent implements OnChanges {
             positions[this.currentTime];
           this.setShape.emit(shape);
         }
-        const annotation = {
+        const annotation: Annotation = {
           ...this.tmpSvgAnnotation,
           shape: {
             ...shape,
@@ -903,7 +915,7 @@ export class HighlighterSvgComponent implements OnChanges {
           ),
         };
     if (isDrawingMode(this.currentMode) && this.rectangleDrawing) {
-      const shape = {
+      const shape: AnnotationShape = {
         ...this.shape,
         type: this.drawingShapeType,
         positions,
@@ -1029,7 +1041,8 @@ export class HighlighterSvgComponent implements OnChanges {
       this.drawnShape = {
         ...this.drawnShape,
         type: getAnnotationShapeType(initialAnnotation.shape),
-        ...initialAnnotation.label,
+        color: initialAnnotation.label?.color || this.drawnShape.color,
+        name: initialAnnotation.label?.name || this.drawnShape.name,
       };
     }
   }
@@ -1192,32 +1205,10 @@ export class HighlighterSvgComponent implements OnChanges {
    * Resize the visible shape when the scene changes
    */
   resizeShape(): void {
-    const currentPosition = this.getPositionAtCurrentTime(this.shape);
-    const isLine = isLineAnnotationPosition(currentPosition);
-    this.drawnShape = {
-      ...this.drawnShape,
-      type: getAnnotationShapeType(this.shape),
-      height: isLine
-        ? Math.abs(currentPosition.y2 - currentPosition.y1)
-        : currentPosition.height,
-      width: isLine
-        ? Math.abs(currentPosition.x2 - currentPosition.x1)
-        : currentPosition.width,
-      posX: isLine
-        ? Math.min(currentPosition.x1, currentPosition.x2)
-        : currentPosition.x,
-      posY: isLine
-        ? Math.min(currentPosition.y1, currentPosition.y2)
-        : currentPosition.y,
-      x1: isLine ? currentPosition.x1 : currentPosition.x,
-      y1: isLine ? currentPosition.y1 : currentPosition.y,
-      x2: isLine
-        ? currentPosition.x2
-        : currentPosition.x + currentPosition.width,
-      y2: isLine
-        ? currentPosition.y2
-        : currentPosition.y + currentPosition.height,
-    };
+    this.drawnShape = this.buildDrawnShapeFromPosition(
+      this.getPositionAtCurrentTime(this.shape),
+      getAnnotationShapeType(this.shape),
+    );
   }
 
   /**
