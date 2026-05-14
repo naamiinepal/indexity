@@ -40,11 +40,16 @@ export class SvgAnnotationToolbarComponent implements OnChanges {
   @Input() videoTime: number;
   @Input() enableEditMode = true;
   @Input() annotationMinDuration = 1000 / 30;
+
+  // FIX: added activateLineDrawingMode to the default value so it matches
+  // the ToolbarShortcuts interface once that field is added there.
   @Input() toolbarShortcuts: ToolbarShortcuts = {
     activateEditMode: 'KeyE',
     activateCreationMode: 'KeyC',
     activateDrawingMode: 'KeyD',
+    activateLineDrawingMode: 'KeyL',
   };
+
   @Input() lockShortcuts = false;
 
   @Output() setMode = new EventEmitter<Mode>();
@@ -65,14 +70,12 @@ export class SvgAnnotationToolbarComponent implements OnChanges {
       changes.mode &&
       changes.mode.currentValue !== changes.mode.previousValue
     ) {
-      this.toggle.value = this.mode?.name === NormalMode.name ? null : this.mode.name;
+      this.toggle.value =
+        this.mode?.name === NormalMode.name ? null : this.mode.name;
     }
-
     if (this.mode === EditMode && changes.tmpSvgAnnotation) {
       this.annotationEdited = false;
     }
-
-    // If the annotation size changed
     if (
       this.mode === EditMode &&
       changes.shape &&
@@ -86,9 +89,6 @@ export class SvgAnnotationToolbarComponent implements OnChanges {
     }
   }
 
-  /**
-   * Activate the annotation creation mode
-   */
   activateAnnotationCreationMode(): void {
     if (this.mode.name !== CreationMode.name) {
       this.toggle.value = CreationMode.name;
@@ -96,9 +96,6 @@ export class SvgAnnotationToolbarComponent implements OnChanges {
     }
   }
 
-  /**
-   * Activate the drawing mode so that the user can add new shapes on the video.
-   */
   activateDrawingMode(mode: Mode = DrawingMode): void {
     if (this.mode.name !== mode.name) {
       this.toggle.value = mode.name;
@@ -106,9 +103,6 @@ export class SvgAnnotationToolbarComponent implements OnChanges {
     }
   }
 
-  /**
-   * Activate the edit mode so that the user can update shapes on the video.
-   */
   activateEditMode(): void {
     if (this.enableEditMode) {
       if (this.mode.name !== EditMode.name) {
@@ -121,30 +115,15 @@ export class SvgAnnotationToolbarComponent implements OnChanges {
     }
   }
 
-  /**
-   * Destroy the last annotation and set the mode back to normal.
-   */
   cancelSvgMode(): void {
-    // continue to listen to keydown events with disabled button
-    // see: https://bugzilla.mozilla.org/show_bug.cgi?id=706773
     this.cancelButton.nativeElement.blur();
-
     this.setMode.emit(NormalMode);
     this.toggle.value = NormalMode.name;
     this.setTmpAnnotation.emit();
   }
 
-  /**
-   * Set the mode back to normal.
-   * Validate the annotations that were made during the drawing mode.
-   * Reset the shape.
-   */
   deactivateSvgMode(): void {
-    // continue to listen to keydown events with disabled button
-    // see: https://bugzilla.mozilla.org/show_bug.cgi?id=706773
     this.validateButton.nativeElement.blur();
-
-    // validate spatial annotation
     if (this.tmpSvgAnnotation && isDrawingMode(this.mode)) {
       const duration = this.videoTime - this.tmpSvgAnnotation.timestamp;
       this.createAnnotation.emit({
@@ -174,7 +153,6 @@ export class SvgAnnotationToolbarComponent implements OnChanges {
         });
       }
     } else if (this.tmpSvgAnnotation && this.mode === CreationMode) {
-      // validate temporal annotation
       const duration = this.videoTime - this.tmpSvgAnnotation.timestamp;
       this.createAnnotation.emit({
         ...this.tmpSvgAnnotation,
@@ -229,13 +207,17 @@ export class SvgAnnotationToolbarComponent implements OnChanges {
     if (this.lockShortcuts) {
       return;
     }
-
     if (event.key === 'Escape') {
       this.cancelSvgMode();
     } else if (event.key === 'Enter') {
       this.deactivateSvgMode();
     } else if (event.code === this.toolbarShortcuts.activateDrawingMode) {
       this.activateDrawingMode();
+    } else if (event.code === this.toolbarShortcuts.activateLineDrawingMode) {
+      // FIX: added KeyL → LineDrawingMode. Without this branch the keyboard
+      // shortcut defined in toolbarShortcuts was completely ignored and the
+      // line drawing mode could only be activated via the toolbar button.
+      this.activateDrawingMode(LineDrawingMode);
     } else if (event.code === this.toolbarShortcuts.activateCreationMode) {
       this.activateAnnotationCreationMode();
     } else if (event.code === this.toolbarShortcuts.activateEditMode) {
